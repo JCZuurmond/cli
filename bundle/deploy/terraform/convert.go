@@ -222,6 +222,20 @@ func BundleToTerraform(config *config.Root) *schema.Root {
 		}
 	}
 
+	for k, src := range config.Resources.Schemas {
+		noResources = false
+		var dst schema.ResourceSchema
+		conv(src, &dst)
+		tfroot.Resource.Schema[k] = &dst
+
+		// Configure permissions for this resource.
+		if rp := convGrants(src.Grants); rp != nil {
+			// TODO: test that this works to allocate grants.
+			rp.Schema = fmt.Sprintf("${databricks_schema.%s.id}", k)
+			tfroot.Resource.Grants["schema_"+k] = rp
+		}
+	}
+
 	// We explicitly set "resource" to nil to omit it from a JSON encoding.
 	// This is required because the terraform CLI requires >= 1 resources defined
 	// if the "resource" property is used in a .tf.json file.
@@ -365,6 +379,16 @@ func TerraformToBundle(state *resourcesState, config *config.Root) error {
 				}
 				cur.ID = instance.Attributes.ID
 				config.Resources.RegisteredModels[resource.Name] = cur
+			case "databricks_schema":
+				if config.Resources.Schemas == nil {
+					config.Resources.Schemas = make(map[string]*resources.Schema)
+				}
+				cur := config.Resources.Schemas[resource.Name]
+				if cur == nil {
+					cur = &resources.Schema{ModifiedStatus: resources.ModifiedStatusDeleted}
+				}
+				cur.ID = instance.Attributes.ID
+				config.Resources.Schemas[resource.Name] = cur
 			case "databricks_permissions":
 			case "databricks_grants":
 				// Ignore; no need to pull these back into the configuration.
@@ -400,6 +424,12 @@ func TerraformToBundle(state *resourcesState, config *config.Root) error {
 		}
 	}
 	for _, src := range config.Resources.RegisteredModels {
+		if src.ModifiedStatus == "" && src.ID == "" {
+			src.ModifiedStatus = resources.ModifiedStatusCreated
+		}
+	}
+	// TODO: Add test for this.
+	for _, src := range config.Resources.Schemas {
 		if src.ModifiedStatus == "" && src.ID == "" {
 			src.ModifiedStatus = resources.ModifiedStatusCreated
 		}
