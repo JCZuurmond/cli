@@ -66,8 +66,10 @@ func convGrants(acl []resources.Grant) *schema.ResourceGrants {
 // BundleToTerraform converts resources in a bundle configuration
 // to the equivalent Terraform JSON representation.
 //
-// NOTE: THIS IS CURRENTLY A HACK. WE NEED A BETTER WAY TO
-// CONVERT TO/FROM TERRAFORM COMPATIBLE FORMAT.
+// Note: This function is an older implementation of the conversion logic. It is
+// no longer used in any code paths and is kept around to be used in tests.
+// New resources do not need to modify this functions, and can instead use the
+// new tfdyn package to define the conversion logic.
 func BundleToTerraform(config *config.Root) *schema.Root {
 	tfroot := schema.NewRoot()
 	tfroot.Provider = schema.NewProviders()
@@ -219,20 +221,6 @@ func BundleToTerraform(config *config.Root) *schema.Root {
 		if rp := convGrants(src.Grants); rp != nil {
 			rp.Function = fmt.Sprintf("${databricks_registered_model.%s.id}", k)
 			tfroot.Resource.Grants["registered_model_"+k] = rp
-		}
-	}
-
-	for k, src := range config.Resources.Schemas {
-		noResources = false
-		var dst schema.ResourceSchema
-		conv(src, &dst)
-		tfroot.Resource.Schema[k] = &dst
-
-		// Configure permissions for this resource.
-		if rp := convGrants(src.Grants); rp != nil {
-			// TODO: test that this works to allocate grants.
-			rp.Schema = fmt.Sprintf("${databricks_schema.%s.id}", k)
-			tfroot.Resource.Grants["schema_"+k] = rp
 		}
 	}
 
@@ -428,7 +416,6 @@ func TerraformToBundle(state *resourcesState, config *config.Root) error {
 			src.ModifiedStatus = resources.ModifiedStatusCreated
 		}
 	}
-	// TODO: Add test for this.
 	for _, src := range config.Resources.Schemas {
 		if src.ModifiedStatus == "" && src.ID == "" {
 			src.ModifiedStatus = resources.ModifiedStatusCreated
