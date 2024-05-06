@@ -105,6 +105,14 @@ func transformDevelopmentMode(ctx context.Context, b *bundle.Bundle) diag.Diagno
 		// (registered models in Unity Catalog don't yet support tags)
 	}
 
+	// TODO: test this manually
+	for i := range r.Schemas {
+		prefix = "dev_" + b.Config.Workspace.CurrentUser.ShortName + "_"
+		r.Schemas[i].Name = prefix + r.Schemas[i].Name
+		// TODO: Do schemas really not support tags?
+		// (schemas don't yet support tags)
+	}
+
 	return nil
 }
 
