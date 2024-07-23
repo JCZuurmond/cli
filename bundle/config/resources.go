@@ -125,6 +125,20 @@ func (r *Resources) VerifyUniqueResourceIdentifiers() (*UniqueResourceIdTracker,
 		tracker.Type[k] = "registered_model"
 		tracker.ConfigPath[k] = r.RegisteredModels[k].ConfigFilePath
 	}
+	for k := range r.Schemas {
+		if _, ok := tracker.Type[k]; ok {
+			return tracker, fmt.Errorf("multiple resources named %s (%s at %s, %s at %s)",
+				k,
+				tracker.Type[k],
+				tracker.ConfigPath[k],
+				"schema",
+				r.Schemas[k].ConfigFilePath,
+			)
+		}
+		tracker.Type[k] = "schema"
+		tracker.ConfigPath[k] = r.Schemas[k].ConfigFilePath
+	}
+
 	for k := range r.QualityMonitors {
 		if _, ok := tracker.Type[k]; ok {
 			return tracker, fmt.Errorf("multiple resources named %s (%s at %s, %s at %s)",
