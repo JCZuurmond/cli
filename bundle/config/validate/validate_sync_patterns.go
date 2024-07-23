@@ -50,7 +50,7 @@ func checkPatterns(patterns []string, path string, rb bundle.ReadOnlyBundle) (di
 		index := i
 		p := pattern
 		errs.Go(func() error {
-			fs, err := fileset.NewGlobSet(rb.RootPath(), []string{p})
+			fs, err := fileset.NewGlobSet(rb.BundleRoot(), []string{p})
 			if err != nil {
 				return err
 			}

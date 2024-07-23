@@ -18,6 +18,7 @@ type Resources struct {
 	ModelServingEndpoints map[string]*resources.ModelServingEndpoint `json:"model_serving_endpoints,omitempty"`
 	RegisteredModels      map[string]*resources.RegisteredModel      `json:"registered_models,omitempty"`
 	Schemas               map[string]*resources.Schema               `json:"schemas,omitempty"`
+	QualityMonitors       map[string]*resources.QualityMonitor       `json:"quality_monitors,omitempty"`
 }
 
 type UniqueResourceIdTracker struct {
@@ -124,7 +125,64 @@ func (r *Resources) VerifyUniqueResourceIdentifiers() (*UniqueResourceIdTracker,
 		tracker.Type[k] = "registered_model"
 		tracker.ConfigPath[k] = r.RegisteredModels[k].ConfigFilePath
 	}
+	for k := range r.QualityMonitors {
+		if _, ok := tracker.Type[k]; ok {
+			return tracker, fmt.Errorf("multiple resources named %s (%s at %s, %s at %s)",
+				k,
+				tracker.Type[k],
+				tracker.ConfigPath[k],
+				"quality_monitor",
+				r.QualityMonitors[k].ConfigFilePath,
+			)
+		}
+		tracker.Type[k] = "quality_monitor"
+		tracker.ConfigPath[k] = r.QualityMonitors[k].ConfigFilePath
+	}
 	return tracker, nil
+}
+
+type resource struct {
+	resource      ConfigResource
+	resource_type string
+	key           string
+}
+
+func (r *Resources) allResources() []resource {
+	all := make([]resource, 0)
+	for k, e := range r.Jobs {
+		all = append(all, resource{resource_type: "job", resource: e, key: k})
+	}
+	for k, e := range r.Pipelines {
+		all = append(all, resource{resource_type: "pipeline", resource: e, key: k})
+	}
+	for k, e := range r.Models {
+		all = append(all, resource{resource_type: "model", resource: e, key: k})
+	}
+	for k, e := range r.Experiments {
+		all = append(all, resource{resource_type: "experiment", resource: e, key: k})
+	}
+	for k, e := range r.ModelServingEndpoints {
+		all = append(all, resource{resource_type: "serving endpoint", resource: e, key: k})
+	}
+	for k, e := range r.RegisteredModels {
+		all = append(all, resource{resource_type: "registered model", resource: e, key: k})
+	}
+	for k, e := range r.QualityMonitors {
+		all = append(all, resource{resource_type: "quality monitor", resource: e, key: k})
+	}
+	return all
+}
+
+func (r *Resources) VerifyAllResourcesDefined() error {
+	all := r.allResources()
+	for _, e := range all {
+		err := e.resource.Validate()
+		if err != nil {
+			return fmt.Errorf("%s %s is not defined", e.resource_type, e.key)
+		}
+	}
+
+	return nil
 }
 
 // ConfigureConfigFilePath sets the specified path for all resources contained in this instance.
@@ -149,11 +207,15 @@ func (r *Resources) ConfigureConfigFilePath() {
 	for _, e := range r.RegisteredModels {
 		e.ConfigureConfigFilePath()
 	}
+	for _, e := range r.QualityMonitors {
+		e.ConfigureConfigFilePath()
+	}
 }
 
 type ConfigResource interface {
 	Exists(ctx context.Context, w *databricks.WorkspaceClient, id string) (bool, error)
 	TerraformResourceName() string
+	Validate() error
 }
 
 func (r *Resources) FindResourceByConfigKey(key string) (ConfigResource, error) {

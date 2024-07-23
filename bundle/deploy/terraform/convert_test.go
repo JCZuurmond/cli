@@ -455,6 +455,24 @@ func TestBundleToTerraformModelServingPermissions(t *testing.T) {
 	var src = resources.ModelServingEndpoint{
 		CreateServingEndpoint: &serving.CreateServingEndpoint{
 			Name: "name",
+
+			// Need to specify this to satisfy the equivalence test:
+			// The previous method of generation includes the "create" field
+			// because it is required (not marked as `omitempty`).
+			// The previous method used [json.Marshal] from the standard library
+			// and as such observed the `omitempty` tag.
+			// The new method leverages [dyn.Value] where any field that is not
+			// explicitly set is not part of the value.
+			Config: serving.EndpointCoreConfigInput{
+				ServedModels: []serving.ServedModelInput{
+					{
+						ModelName:          "model_name",
+						ModelVersion:       "1",
+						ScaleToZeroEnabled: true,
+						WorkloadSize:       "Small",
+					},
+				},
+			},
 		},
 		Permissions: []resources.Permission{
 			{
@@ -637,6 +655,15 @@ func TestTerraformToBundleEmptyLocalResources(t *testing.T) {
 					{Attributes: stateInstanceAttributes{ID: "1"}},
 				},
 			},
+			{
+
+				Type: "databricks_quality_monitor",
+				Mode: "managed",
+				Name: "test_monitor",
+				Instances: []stateResourceInstance{
+					{Attributes: stateInstanceAttributes{ID: "1"}},
+				},
+			},
 		},
 	}
 	err := TerraformToBundle(&tfState, &config)
@@ -662,6 +689,9 @@ func TestTerraformToBundleEmptyLocalResources(t *testing.T) {
 
 	assert.Equal(t, "1", config.Resources.Schemas["test_schema"].ID)
 	assert.Equal(t, resources.ModifiedStatusDeleted, config.Resources.Schemas["test_schema"].ModifiedStatus)
+
+	assert.Equal(t, "1", config.Resources.QualityMonitors["test_monitor"].ID)
+	assert.Equal(t, resources.ModifiedStatusDeleted, config.Resources.QualityMonitors["test_monitor"].ModifiedStatus)
 
 	AssertFullResourceCoverage(t, &config)
 }
@@ -718,6 +748,13 @@ func TestTerraformToBundleEmptyRemoteResources(t *testing.T) {
 					},
 				},
 			},
+			QualityMonitors: map[string]*resources.QualityMonitor{
+				"test_monitor": {
+					CreateMonitor: &catalog.CreateMonitor{
+						TableName: "test_monitor",
+					},
+				},
+			},
 		},
 	}
 	var tfState = resourcesState{
@@ -746,6 +783,9 @@ func TestTerraformToBundleEmptyRemoteResources(t *testing.T) {
 
 	assert.Equal(t, "", config.Resources.Schemas["test_schema"].ID)
 	assert.Equal(t, resources.ModifiedStatusCreated, config.Resources.Schemas["test_schema"].ModifiedStatus)
+
+	assert.Equal(t, "", config.Resources.QualityMonitors["test_monitor"].ID)
+	assert.Equal(t, resources.ModifiedStatusCreated, config.Resources.QualityMonitors["test_monitor"].ModifiedStatus)
 
 	AssertFullResourceCoverage(t, &config)
 }
@@ -834,6 +874,18 @@ func TestTerraformToBundleModifiedResources(t *testing.T) {
 				"test_schema_new": {
 					CreateSchema: &catalog.CreateSchema{
 						Name: "test_schema_new",
+					},
+				},
+			},
+			QualityMonitors: map[string]*resources.QualityMonitor{
+				"test_monitor": {
+					CreateMonitor: &catalog.CreateMonitor{
+						TableName: "test_monitor",
+					},
+				},
+				"test_monitor_new": {
+					CreateMonitor: &catalog.CreateMonitor{
+						TableName: "test_monitor_new",
 					},
 				},
 			},
@@ -953,6 +1005,22 @@ func TestTerraformToBundleModifiedResources(t *testing.T) {
 					{Attributes: stateInstanceAttributes{ID: "2"}},
 				},
 			},
+			{
+				Type: "databricks_quality_monitor",
+				Mode: "managed",
+				Name: "test_monitor",
+				Instances: []stateResourceInstance{
+					{Attributes: stateInstanceAttributes{ID: "test_monitor"}},
+				},
+			},
+			{
+				Type: "databricks_quality_monitor",
+				Mode: "managed",
+				Name: "test_monitor_old",
+				Instances: []stateResourceInstance{
+					{Attributes: stateInstanceAttributes{ID: "test_monitor_old"}},
+				},
+			},
 		},
 	}
 	err := TerraformToBundle(&tfState, &config)
@@ -1006,6 +1074,13 @@ func TestTerraformToBundleModifiedResources(t *testing.T) {
 	assert.Equal(t, resources.ModifiedStatusDeleted, config.Resources.Schemas["test_schema_old"].ModifiedStatus)
 	assert.Equal(t, "", config.Resources.Schemas["test_schema_new"].ID)
 	assert.Equal(t, resources.ModifiedStatusCreated, config.Resources.Schemas["test_schema_new"].ModifiedStatus)
+
+	assert.Equal(t, "test_monitor", config.Resources.QualityMonitors["test_monitor"].ID)
+	assert.Equal(t, "", config.Resources.QualityMonitors["test_monitor"].ModifiedStatus)
+	assert.Equal(t, "test_monitor_old", config.Resources.QualityMonitors["test_monitor_old"].ID)
+	assert.Equal(t, resources.ModifiedStatusDeleted, config.Resources.QualityMonitors["test_monitor_old"].ModifiedStatus)
+	assert.Equal(t, "", config.Resources.QualityMonitors["test_monitor_new"].ID)
+	assert.Equal(t, resources.ModifiedStatusCreated, config.Resources.QualityMonitors["test_monitor_new"].ModifiedStatus)
 
 	AssertFullResourceCoverage(t, &config)
 }

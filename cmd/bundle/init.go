@@ -38,18 +38,22 @@ var nativeTemplates = []nativeTemplate{
 	{
 		name:        "default-sql",
 		description: "The default SQL template for .sql files that run with Databricks SQL",
-		hidden:      true,
 	},
 	{
 		name:        "dbt-sql",
-		description: "The dbt SQL template (https://www.databricks.com/blog/delivering-cost-effective-data-real-time-dbt-and-databricks)",
-		hidden:      true,
+		description: "The dbt SQL template (databricks.com/blog/delivering-cost-effective-data-real-time-dbt-and-databricks)",
 	},
 	{
 		name:        "mlops-stacks",
 		gitUrl:      "https://github.com/databricks/mlops-stacks",
 		description: "The Databricks MLOps Stacks template (github.com/databricks/mlops-stacks)",
 		aliases:     []string{"mlops-stack"},
+	},
+	{
+		name:        "default-pydabs",
+		gitUrl:      "https://databricks.github.io/workflows-authoring-toolkit/pydabs-template.git",
+		hidden:      true,
+		description: "The default PyDABs template",
 	},
 	{
 		name:        customTemplate,
